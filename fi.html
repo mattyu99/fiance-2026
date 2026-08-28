@@ -242,6 +242,11 @@
 
       <div id="shareInfoBox" style="display:none;">
         <p class="note-box" id="shareInfoText"></p>
+        <div style="text-align:center; margin:14px 0;">
+          <img id="joinQr" style="width:180px; height:180px; border-radius:16px; border:2px solid var(--line); background:#fff; padding:8px;">
+          <div style="font-size:12px; color:var(--ink-soft); font-weight:800; margin-top:6px;">家人用手機相機掃這個 QR Code 就能加入 📸</div>
+        </div>
+        <button class="google-btn" onclick="copyJoinLink()">📋 複製加入連結</button>
         <button class="google-btn" onclick="openDriveShare()">📤 開啟 Google 試算表分享設定</button>
       </div>
     </div>
@@ -460,11 +465,14 @@ async function createNewSheet(){
     const data = await res.json();
     setSheetId(data.spreadsheetId);
     await connectToSheet(data.spreadsheetId);
+    const joinUrl = location.origin + location.pathname + '?sheet=' + data.spreadsheetId;
+    window._joinUrl = joinUrl;
+    window._newSheetUrl = data.spreadsheetUrl;
     const shareBox = document.getElementById('shareInfoBox');
     shareBox.style.display = 'block';
     document.getElementById('shareInfoText').textContent =
-      '試算表建立好了！請點下面按鈕開啟 Google 試算表，右上角「共用」給家人的 Gmail（權限選「編輯者」）。之後把這個網址加上 ?sheet=' + data.spreadsheetId + ' 傳給家人，他們登入後就會自動加入。';
-    window._newSheetUrl = data.spreadsheetUrl;
+      '試算表建立好了！先點下面按鈕把試算表分享給家人的 Gmail（權限選「編輯者」），再把 QR Code 或連結傳給他們，他們登入自己的 Google 帳號後就會自動加入，不需要輸入任何 ID。';
+    document.getElementById('joinQr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(joinUrl);
   }catch(e){
     console.error(e);
     setSyncStatus('⚠️ 建立試算表失敗');
@@ -472,6 +480,12 @@ async function createNewSheet(){
   }
 }
 function openDriveShare(){ if(window._newSheetUrl) window.open(window._newSheetUrl, '_blank'); }
+function copyJoinLink(){
+  if(!window._joinUrl) return;
+  navigator.clipboard?.writeText(window._joinUrl).then(()=>{
+    alert('連結已複製，傳給家人，打開後登入 Google 就會自動加入！');
+  }).catch(()=>{ alert('你的加入連結是：' + window._joinUrl); });
+}
 
 async function joinSheet(){
   const id = document.getElementById('sheetIdInput').value.trim();
