@@ -322,6 +322,8 @@ let tokenClient = null;
 let pollTimer = null;
 
 /* ---------------- Google sign-in ---------------- */
+let silentAttemptFailed = false;
+
 window.addEventListener('load', ()=>{
   const check = setInterval(()=>{
     if(typeof google !== 'undefined' && google.accounts){
@@ -330,27 +332,34 @@ window.addEventListener('load', ()=>{
         client_id: GOOGLE_CLIENT_ID,
         scope: SHEETS_SCOPE + ' ' + DRIVE_FILE_SCOPE,
         callback: async (resp)=>{
-          if(resp.error){ setSyncStatus('⚠️ 登入失敗，請再試一次'); return; }
+          if(resp.error){
+            // Silent attempt failed (e.g. no active Google session, or first-ever visit) — fall back to manual sign-in
+            silentAttemptFailed = true;
+            setSyncStatus('👤 請登入 Google 以同步');
+            openConnectSheet();
+            return;
+          }
           accessToken = resp.access_token;
           document.getElementById('signInBtn').textContent = '✅ 已登入 Google';
           document.getElementById('afterSignInBox').style.display = 'block';
           const urlSheetId = new URLSearchParams(location.search).get('sheet');
           if(urlSheetId){ setSheetId(urlSheetId); }
           if(getSheetId()){ await connectToSheet(getSheetId()); closeConnectSheet(); }
-          else { setSyncStatus('👤 已登入，請建立或加入試算表'); }
+          else { setSyncStatus('👤 已登入，請建立或加入試算表'); openConnectSheet(); }
         }
       });
       const urlSheetId = new URLSearchParams(location.search).get('sheet');
       if(urlSheetId) setSheetId(urlSheetId);
+
       if(GOOGLE_CLIENT_ID.indexOf('PASTE_YOUR') === 0){
         setSyncStatus('⚠️ 尚未設定 Google Client ID');
-      } else if(!getSheetId()){
-        setSyncStatus('👤 尚未連接試算表');
-        openConnectSheet();
-      } else {
-        setSyncStatus('👤 請登入 Google 以同步');
-        openConnectSheet();
+        render();
+        return;
       }
+      // Try to silently re-authenticate — succeeds quietly if this browser already has a Google
+      // session and previously granted consent. No popup or click needed when it works.
+      setSyncStatus('☁️ 嘗試自動連線中…');
+      tokenClient.requestAccessToken({ prompt: '' });
       render();
     }
   }, 200);
